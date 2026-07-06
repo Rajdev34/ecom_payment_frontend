@@ -122,11 +122,13 @@ export default function ApplyForm() {
       let documentUrl: string | null = null;
 
       // 1. Upload files to the Express Node.js Server
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
       if (docFile) {
         const formData = new FormData();
         formData.append('document', docFile);
 
-        const uploadResponse = await fetch('http://localhost:5000/api/applications/upload', {
+        const uploadResponse = await fetch(`${apiBase}/api/applications/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -176,7 +178,7 @@ export default function ApplyForm() {
         document_url: documentUrl,
       };
 
-      const response = await fetch('http://localhost:5000/api/applications', {
+      const response = await fetch(`${apiBase}/api/applications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
