@@ -17,7 +17,7 @@ const validBasePayload = {
   business_start_date: '2020-01-01',
   has_llc: true,
   has_us_signer: true,
-  owner1_ssn_itin: 'XXX-XX-XXXX',
+  owner1_ssn_itin: '123-45-6789',
   owner1_personal_phone: '1234567890',
   owner2_legal_name: '',
   owner2_ownership_pct: '',
@@ -91,6 +91,132 @@ describe('applicationSchema Zod validation', () => {
     if (!result.success) {
       const industryError = result.error.issues.find((issue) => issue.path.includes('industry'));
       expect(industryError?.message).toBe('Please select a valid industry');
+    }
+  });
+
+  it('fails validation when name contains numbers', () => {
+    const payload = { ...validBasePayload, contact_name: 'John Doe 123' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const nameError = result.error.issues.find((issue) => issue.path.includes('contact_name'));
+      expect(nameError?.message).toBe('Contact name must not contain numbers');
+    }
+  });
+
+  it('fails validation when optional owner 2 name contains numbers', () => {
+    const payload = { ...validBasePayload, owner2_legal_name: 'Jane Smith 9' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const nameError = result.error.issues.find((issue) => issue.path.includes('owner2_legal_name'));
+      expect(nameError?.message).toBe('Owner 2 legal name must not contain numbers');
+    }
+  });
+
+  it('successfully cleans and coerces dollar/comma strings into numbers', () => {
+    const payload = {
+      ...validBasePayload,
+      avg_monthly_volume: '$10,500.50',
+      avg_transaction_size: '$100',
+      high_ticket_size: '$500',
+    };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.avg_monthly_volume).toBe(10500.50);
+      expect(result.data.avg_transaction_size).toBe(100);
+      expect(result.data.high_ticket_size).toBe(500);
+    }
+  });
+
+  it('fails validation when numeric fields are non-numeric strings', () => {
+    const payload = { ...validBasePayload, avg_monthly_volume: 'five thousand' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const volumeError = result.error.issues.find((issue) => issue.path.includes('avg_monthly_volume'));
+      expect(volumeError?.message).toBe('Average monthly processing volume must be a number');
+    }
+  });
+
+  it('successfully cleans and coerces phone numbers to numbers', () => {
+    const payload = {
+      ...validBasePayload,
+      phone: '+1 (123) 456-7890',
+      owner1_personal_phone: '098-765-4321',
+    };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.phone).toBe(11234567890);
+      expect(result.data.owner1_personal_phone).toBe(987654321);
+    }
+  });
+
+  it('fails validation when phone numbers contain letters', () => {
+    const payload = { ...validBasePayload, phone: '123-abc-7890' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const phoneError = result.error.issues.find((issue) => issue.path.includes('phone'));
+      expect(phoneError?.message).toBe('Phone number must be a number');
+    }
+  });
+
+  it('successfully cleans and coerces optional previous processor to a number if provided', () => {
+    const payload = { ...validBasePayload, previous_processor: '$150,000' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.previous_processor).toBe(150000);
+    }
+  });
+
+  it('fails validation when optional previous processor has non-numeric text', () => {
+    const payload = { ...validBasePayload, previous_processor: 'Stripe Payments' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const procError = result.error.issues.find((issue) => issue.path.includes('previous_processor'));
+      expect(procError?.message).toBe('Previous processor must be a number');
+    }
+  });
+
+  it('successfully cleans and coerces optional Owner 2 ownership percentage to a number if provided', () => {
+    const payload = { ...validBasePayload, owner2_ownership_pct: '25.5%' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.owner2_ownership_pct).toBe(25.5);
+    }
+  });
+
+  it('fails validation when optional Owner 2 ownership percentage has non-numeric text', () => {
+    const payload = { ...validBasePayload, owner2_ownership_pct: 'twenty five percent' };
+    const result = applicationSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const pctError = result.error.issues.find((issue) => issue.path.includes('owner2_ownership_pct'));
+      expect(pctError?.message).toBe('Owner 2 ownership percentage must be a number');
+    }
+  });
+
+  it('fails validation when tax ID or SSN contains invalid characters like letters', () => {
+    const payloadTaxInvalid = { ...validBasePayload, federal_tax_id: '12-abc4567' };
+    const resultTax = applicationSchema.safeParse(payloadTaxInvalid);
+    expect(resultTax.success).toBe(false);
+    if (!resultTax.success) {
+      const taxError = resultTax.error.issues.find((issue) => issue.path.includes('federal_tax_id'));
+      expect(taxError?.message).toBe('Federal tax ID must only contain numbers and dashes');
+    }
+
+    const payloadSsnInvalid = { ...validBasePayload, owner1_ssn_itin: 'XXX-XX-XXXY' };
+    const resultSsn = applicationSchema.safeParse(payloadSsnInvalid);
+    expect(resultSsn.success).toBe(false);
+    if (!resultSsn.success) {
+      const ssnError = resultSsn.error.issues.find((issue) => issue.path.includes('owner1_ssn_itin'));
+      expect(ssnError?.message).toBe('SSN or ITIN must only contain numbers and dashes');
     }
   });
 });
