@@ -59,7 +59,7 @@ export default function Industries() {
           </h2>
           <p className="mt-4 text-lg text-ink-300 text-balance">
             Traditional processors label these industries "high-risk" and shut them down.
-            We built Helix Pay specifically to keep them running.
+            We built Ecom Payments specifically to keep them running.
           </p>
         </div>
 

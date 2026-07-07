@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ArrowRight, CheckCircle2, Loader2, AlertCircle,
   Building2, UserCheck, Info, UploadCloud, FileCheck,
 } from 'lucide-react';
 // import { supabase } from '../lib/supabase';
 import { useReveal } from '../hooks/useReveal';
+import { applicationSchema } from '../schemas/application';
 
 const industries = [
   { value: 'ecommerce', label: 'E-Commerce' },
@@ -93,17 +94,34 @@ export default function ApplyForm() {
   const { ref, visible } = useReveal<HTMLDivElement>();
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ ...emptyForm });
   const [docFile, setDocFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const update = (key: keyof typeof form, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // Clear individual field error as user modifies it
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   };
 
   const handleFile = (file: File | null) => {
     setDocFile(file);
+    if (file) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.document;
+        return next;
+      });
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -117,73 +135,68 @@ export default function ApplyForm() {
     e.preventDefault();
     setStatus('submitting');
     setErrorMsg('');
+    setFieldErrors({});
+
+    let hasErrors = false;
+    const errors: Record<string, string> = {};
+
+    // 1. Run ZIP file validation
+    if (!docFile) {
+      errors.document = 'A ZIP file containing all required documents is required';
+      hasErrors = true;
+    }
+
+    // 2. Run Zod validation on frontend state
+    const validationResult = applicationSchema.safeParse(form);
+
+    if (!validationResult.success) {
+      validationResult.error.issues.forEach((issue) => {
+        const path = issue.path[0];
+        if (typeof path === 'string') {
+          errors[path] = issue.message;
+        }
+      });
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      setStatus('idle');
+      setFieldErrors(errors);
+      
+      // Scroll to the first field that has an error
+      const firstErrorField = errors.document ? 'document-drop-zone' : (validationResult.success ? null : validationResult.error.issues[0].path[0]);
+      if (typeof firstErrorField === 'string') {
+        const element = document.getElementById(firstErrorField);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        } else {
+          formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+      return; // Stop submission
+    }
 
     try {
-      let documentUrl: string | null = null;
-
-      // 1. Upload files to the Express Node.js Server
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const formData = new FormData();
 
-      if (docFile) {
-        const formData = new FormData();
-        formData.append('document', docFile);
+      // 3. Append the file (guaranteed to exist now)
+      formData.append('document', docFile!);
 
-        const uploadResponse = await fetch(`${apiBase}/api/applications/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.error || 'Failed to upload application files.');
+      // 4. Append all form details to the FormData object
+      Object.entries(form).forEach(([key, value]) => {
+        if (typeof value === 'boolean') {
+          formData.append(key, String(value));
+        } else if (value !== null && value !== undefined) {
+          formData.append(key, String(value));
         }
+      });
 
-        const uploadResult = await uploadResponse.json();
-        documentUrl = uploadResult.path; // Get the generated path from the backend
-      }
-
-      // 2. Submit the form application details to the Express Node.js Server
-      const payload = {
-        business_name: form.business_name,
-        legal_address: form.legal_address,
-        dba_name: form.dba_name || null,
-        dba_address: form.dba_address || null,
-        federal_tax_id: form.federal_tax_id,
-        business_start_date: form.business_start_date || null,
-        contact_name: form.contact_name,
-        email: form.email,
-        phone: form.phone,
-        owner1_ssn_itin: form.owner1_ssn_itin || null,
-        owner1_personal_phone: form.owner1_personal_phone || null,
-        owner2_legal_name: form.owner2_legal_name || null,
-        owner2_ownership_pct: form.owner2_ownership_pct || null,
-        owner2_job_title: form.owner2_job_title || null,
-        owner2_date_of_birth: form.owner2_date_of_birth || null,
-        owner2_address: form.owner2_address || null,
-        website: form.website || null,
-        country: form.country,
-        industry: form.industry,
-        monthly_volume: form.monthly_volume,
-        payment_method_in_person: form.payment_method_in_person,
-        payment_method_online: form.payment_method_online,
-        payment_method_phone_invoice: form.payment_method_phone_invoice,
-        avg_monthly_volume: form.avg_monthly_volume || null,
-        avg_transaction_size: form.avg_transaction_size || null,
-        high_ticket_size: form.high_ticket_size || null,
-        existing_processing: form.existing_processing || null,
-        previous_processor: form.previous_processor || null,
-        has_llc: form.has_llc,
-        has_us_signer: form.has_us_signer,
-        description: form.description || null,
-        document_url: documentUrl,
-      };
-
-      const response = await fetch(`${apiBase}/api/applications`, {
+      // 5. Submit the single multipart request
+      const response = await fetch(`${apiBase}/api/applications/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -195,6 +208,8 @@ export default function ApplyForm() {
     } catch (err) {
       setStatus('error');
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setFieldErrors({});
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -257,19 +272,11 @@ export default function ApplyForm() {
         </div>
 
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
+          noValidate
           className={`mt-6 card p-6 sm:p-8 reveal ${visible ? 'is-visible' : ''}`}
         >
-          {status === 'error' && (
-            <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
-              <div>
-                <p className="text-sm font-medium text-red-300">Submission failed</p>
-                <p className="mt-0.5 text-sm text-red-400/80">{errorMsg}</p>
-              </div>
-            </div>
-          )}
-
           {/* ── Business Information ── */}
           <SectionHeading label="Business Information" />
           <div className="grid gap-5 sm:grid-cols-2">
@@ -283,9 +290,12 @@ export default function ApplyForm() {
                 required
                 value={form.business_name}
                 onChange={(e) => update('business_name', e.target.value)}
-                className="input-field"
+                className={`input-field ${fieldErrors.business_name ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 placeholder="Acme Inc."
               />
+              {fieldErrors.business_name && (
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.business_name}</p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
@@ -298,9 +308,12 @@ export default function ApplyForm() {
                 required
                 value={form.legal_address}
                 onChange={(e) => update('legal_address', e.target.value)}
-                className="input-field"
+                className={`input-field ${fieldErrors.legal_address ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 placeholder="123 Main St, Suite 100, New York, NY 10001"
               />
+              {fieldErrors.legal_address && (
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.legal_address}</p>
+              )}
             </div>
 
             <div>
@@ -313,9 +326,12 @@ export default function ApplyForm() {
                 required
                 value={form.dba_name}
                 onChange={(e) => update('dba_name', e.target.value)}
-                className="input-field"
+                className={`input-field ${fieldErrors.dba_name ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 placeholder="Acme Store"
               />
+              {fieldErrors.dba_name && (
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.dba_name}</p>
+              )}
             </div>
 
             <div>
@@ -327,9 +343,12 @@ export default function ApplyForm() {
                 type="text"
                 value={form.dba_address}
                 onChange={(e) => update('dba_address', e.target.value)}
-                className="input-field"
+                className={`input-field ${fieldErrors.dba_address ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 placeholder="456 Commerce Ave, Austin, TX 78701"
               />
+              {fieldErrors.dba_address && (
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.dba_address}</p>
+              )}
             </div>
 
             <div>
@@ -342,9 +361,12 @@ export default function ApplyForm() {
                 required
                 value={form.federal_tax_id}
                 onChange={(e) => update('federal_tax_id', e.target.value)}
-                className="input-field"
+                className={`input-field ${fieldErrors.federal_tax_id ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 placeholder="12-3456789"
               />
+              {fieldErrors.federal_tax_id && (
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.federal_tax_id}</p>
+              )}
             </div>
 
             <div>
@@ -357,8 +379,11 @@ export default function ApplyForm() {
                 required
                 value={form.business_start_date}
                 onChange={(e) => update('business_start_date', e.target.value)}
-                className="input-field [color-scheme:light] [&::-webkit-calendar-picker-indicator]:[filter:invert(1)] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80 hover:[&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-datetime-edit]:text-white [&::-webkit-datetime-edit-fields-wrapper]:text-white"
+                className={`input-field [color-scheme:light] [&::-webkit-calendar-picker-indicator]:[filter:invert(1)] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80 hover:[&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-datetime-edit]:text-white [&::-webkit-datetime-edit-fields-wrapper]:text-white ${fieldErrors.business_start_date ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
               />
+              {fieldErrors.business_start_date && (
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.business_start_date}</p>
+              )}
             </div>
           </div>
 
@@ -376,9 +401,12 @@ export default function ApplyForm() {
                   required
                   value={form.contact_name}
                   onChange={(e) => update('contact_name', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.contact_name ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="Jane Doe"
                 />
+                {fieldErrors.contact_name && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.contact_name}</p>
+                )}
               </div>
 
               <div>
@@ -391,9 +419,12 @@ export default function ApplyForm() {
                   required
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.email ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="jane@acme.com"
                 />
+                {fieldErrors.email && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div>
@@ -406,9 +437,12 @@ export default function ApplyForm() {
                   required
                   value={form.phone}
                   onChange={(e) => update('phone', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.phone ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="+1 (555) 123-4567"
                 />
+                {fieldErrors.phone && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.phone}</p>
+                )}
               </div>
 
               <div>
@@ -421,9 +455,12 @@ export default function ApplyForm() {
                   required
                   value={form.owner1_personal_phone}
                   onChange={(e) => update('owner1_personal_phone', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.owner1_personal_phone ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="+1 (555) 987-6543"
                 />
+                {fieldErrors.owner1_personal_phone && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner1_personal_phone}</p>
+                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -436,9 +473,12 @@ export default function ApplyForm() {
                   required
                   value={form.owner1_ssn_itin}
                   onChange={(e) => update('owner1_ssn_itin', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.owner1_ssn_itin ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="XXX-XX-XXXX"
                 />
+                {fieldErrors.owner1_ssn_itin && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner1_ssn_itin}</p>
+                )}
               </div>
             </div>
           </div>
@@ -456,9 +496,12 @@ export default function ApplyForm() {
                   type="text"
                   value={form.owner2_legal_name}
                   onChange={(e) => update('owner2_legal_name', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.owner2_legal_name ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="John Doe"
                 />
+                {fieldErrors.owner2_legal_name && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner2_legal_name}</p>
+                )}
               </div>
 
               <div>
@@ -470,9 +513,12 @@ export default function ApplyForm() {
                   type="text"
                   value={form.owner2_ownership_pct}
                   onChange={(e) => update('owner2_ownership_pct', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.owner2_ownership_pct ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="25%"
                 />
+                {fieldErrors.owner2_ownership_pct && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner2_ownership_pct}</p>
+                )}
               </div>
 
               <div>
@@ -484,9 +530,12 @@ export default function ApplyForm() {
                   type="text"
                   value={form.owner2_job_title}
                   onChange={(e) => update('owner2_job_title', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.owner2_job_title ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="COO"
                 />
+                {fieldErrors.owner2_job_title && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner2_job_title}</p>
+                )}
               </div>
 
               <div>
@@ -498,8 +547,11 @@ export default function ApplyForm() {
                   type="date"
                   value={form.owner2_date_of_birth}
                   onChange={(e) => update('owner2_date_of_birth', e.target.value)}
-                  className="input-field [color-scheme:light] [&::-webkit-calendar-picker-indicator]:[filter:invert(1)] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80 hover:[&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-datetime-edit]:text-white [&::-webkit-datetime-edit-fields-wrapper]:text-white"
+                  className={`input-field [color-scheme:light] [&::-webkit-calendar-picker-indicator]:[filter:invert(1)] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80 hover:[&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-datetime-edit]:text-white [&::-webkit-datetime-edit-fields-wrapper]:text-white ${fieldErrors.owner2_date_of_birth ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 />
+                {fieldErrors.owner2_date_of_birth && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner2_date_of_birth}</p>
+                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -511,9 +563,12 @@ export default function ApplyForm() {
                   type="text"
                   value={form.owner2_address}
                   onChange={(e) => update('owner2_address', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.owner2_address ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="789 Elm St, Chicago, IL 60601"
                 />
+                {fieldErrors.owner2_address && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.owner2_address}</p>
+                )}
               </div>
             </div>
           </div>
@@ -531,13 +586,16 @@ export default function ApplyForm() {
                   required
                   value={form.industry}
                   onChange={(e) => update('industry', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.industry ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 >
                   <option value="" className="bg-ink-950 text-ink-400">Select your industry</option>
                   {industries.map((ind) => (
                     <option key={ind.value} value={ind.value} className="bg-ink-950 text-white">{ind.label}</option>
                   ))}
                 </select>
+                {fieldErrors.industry && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.industry}</p>
+                )}
               </div>
 
               <div>
@@ -549,13 +607,16 @@ export default function ApplyForm() {
                   required
                   value={form.monthly_volume}
                   onChange={(e) => update('monthly_volume', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.monthly_volume ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                 >
                   <option value="" className="bg-ink-950 text-ink-400">Select your volume range</option>
                   {volumes.map((vol) => (
                     <option key={vol} value={vol} className="bg-ink-950 text-white">{vol}</option>
                   ))}
                 </select>
+                {fieldErrors.monthly_volume && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.monthly_volume}</p>
+                )}
               </div>
 
               <div>
@@ -567,9 +628,12 @@ export default function ApplyForm() {
                   type="url"
                   value={form.website}
                   onChange={(e) => update('website', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.website ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="https://acme.com"
                 />
+                {fieldErrors.website && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.website}</p>
+                )}
               </div>
 
               <div>
@@ -582,9 +646,12 @@ export default function ApplyForm() {
                   required
                   value={form.country}
                   onChange={(e) => update('country', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.country ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="United States"
                 />
+                {fieldErrors.country && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.country}</p>
+                )}
               </div>
             </div>
           </div>
@@ -626,9 +693,12 @@ export default function ApplyForm() {
                   required
                   value={form.avg_monthly_volume}
                   onChange={(e) => update('avg_monthly_volume', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.avg_monthly_volume ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="$50,000"
                 />
+                {fieldErrors.avg_monthly_volume && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.avg_monthly_volume}</p>
+                )}
               </div>
 
               <div>
@@ -641,9 +711,12 @@ export default function ApplyForm() {
                   required
                   value={form.avg_transaction_size}
                   onChange={(e) => update('avg_transaction_size', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.avg_transaction_size ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="$150"
                 />
+                {fieldErrors.avg_transaction_size && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.avg_transaction_size}</p>
+                )}
               </div>
 
               <div>
@@ -656,9 +729,12 @@ export default function ApplyForm() {
                   required
                   value={form.high_ticket_size}
                   onChange={(e) => update('high_ticket_size', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.high_ticket_size ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="$1,000"
                 />
+                {fieldErrors.high_ticket_size && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.high_ticket_size}</p>
+                )}
               </div>
 
               <div>
@@ -670,9 +746,12 @@ export default function ApplyForm() {
                   type="text"
                   value={form.previous_processor}
                   onChange={(e) => update('previous_processor', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.previous_processor ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="Stripe, Square, etc."
                 />
+                {fieldErrors.previous_processor && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.previous_processor}</p>
+                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -684,9 +763,12 @@ export default function ApplyForm() {
                   type="text"
                   value={form.existing_processing}
                   onChange={(e) => update('existing_processing', e.target.value)}
-                  className="input-field"
+                  className={`input-field ${fieldErrors.existing_processing ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="Yes, 2 years with Stripe"
                 />
+                {fieldErrors.existing_processing && (
+                  <p className="mt-1 text-xs text-red-400">{fieldErrors.existing_processing}</p>
+                )}
               </div>
             </div>
           </div>
@@ -753,9 +835,12 @@ export default function ApplyForm() {
               rows={4}
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
-              className="input-field resize-none"
+              className={`input-field resize-none ${fieldErrors.description ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500' : ''}`}
               placeholder="What do you sell? How do you accept payments today? Any processing history or current processor?"
             />
+            {fieldErrors.description && (
+              <p className="mt-1 text-xs text-red-400">{fieldErrors.description}</p>
+            )}
           </div>
 
           {/* ── File Upload ── */}
@@ -780,6 +865,7 @@ export default function ApplyForm() {
 
             {/* Drop zone */}
             <div
+              id="document-drop-zone"
               role="button"
               tabIndex={0}
               onClick={() => fileInputRef.current?.click()}
@@ -790,6 +876,8 @@ export default function ApplyForm() {
               className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-all duration-200 ${
                 isDragging
                   ? 'border-brand-400 bg-brand-500/10'
+                  : fieldErrors.document
+                  ? 'border-red-500/80 bg-red-500/5'
                   : docFile
                   ? 'border-brand-500/50 bg-brand-500/5'
                   : 'border-ink-700 hover:border-ink-500 hover:bg-ink-800/40'
@@ -822,6 +910,9 @@ export default function ApplyForm() {
                 </>
               )}
             </div>
+            {fieldErrors.document && (
+              <p className="mt-2 text-xs text-red-400">{fieldErrors.document}</p>
+            )}
 
             <input
               ref={fileInputRef}
@@ -831,6 +922,16 @@ export default function ApplyForm() {
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
             />
           </div>
+
+          {status === 'error' && (
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+              <div>
+                <p className="text-sm font-medium text-red-300">Submission failed</p>
+                <p className="mt-0.5 text-sm text-red-400/80">{errorMsg}</p>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

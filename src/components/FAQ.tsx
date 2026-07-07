@@ -81,7 +81,7 @@ export default function FAQ() {
             Questions, answered
           </h2>
           <p className="mt-4 text-lg text-ink-300 text-balance">
-            Everything you need to know about high-risk payment processing with Helix Pay.
+            Everything you need to know about high-risk payment processing with Ecom Payments.
           </p>
         </div>
 

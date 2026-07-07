@@ -4,7 +4,7 @@ import { useReveal } from '../hooks/useReveal';
 const testimonials = [
   {
     quote:
-      'We were dropped by two processors in six months for being "high-risk." Helix Pay not only approved us in 3 days, but our chargeback ratio dropped 40% with their defense tools. We have not looked back.',
+      'We were dropped by two processors in six months for being "high-risk." Ecom Payments not only approved us in 3 days, but our chargeback ratio dropped 40% with their defense tools. We have not looked back.',
     name: 'Marcus Reid',
     role: 'Founder, ApexSupplements',
     industry: 'Supplements',
@@ -12,7 +12,7 @@ const testimonials = [
   },
   {
     quote:
-      'Processing $400K/month in dropshipping volume and nobody would touch us. Helix Pay understood the model, gave us a fair reserve structure, and scaled with us. Game changer.',
+      'Processing $400K/month in dropshipping volume and nobody would touch us. Ecom Payments understood the model, gave us a fair reserve structure, and scaled with us. Game changer.',
     name: 'Sarah Chen',
     role: 'CEO, TrendDrop',
     industry: 'Dropshipping',
@@ -20,7 +20,7 @@ const testimonials = [
   },
   {
     quote:
-      'My coaching program does $30K launches. Other processors capped me at $5K per transaction. Helix Pay approved high-ticket processing on day one. My conversion rate doubled.',
+      'My coaching program does $30K launches. Other processors capped me at $5K per transaction. Ecom Payments approved high-ticket processing on day one. My conversion rate doubled.',
     name: 'David Okonkwo',
     role: 'Business Coach',
     industry: 'Coaching',
@@ -36,7 +36,7 @@ const testimonials = [
   },
   {
     quote:
-      'SaaS billing is complex — proration, upgrades, downgrades, usage tiers. Helix Pay handles all of it. Our involuntary churn dropped from 4.2% to 1.1% in two months.',
+      'SaaS billing is complex — proration, upgrades, downgrades, usage tiers. Ecom Payments handles all of it. Our involuntary churn dropped from 4.2% to 1.1% in two months.',
     name: 'James Park',
     role: 'CFO, CloudPulse',
     industry: 'SaaS',
@@ -44,7 +44,7 @@ const testimonials = [
   },
   {
     quote:
-      'Our DTC e-commerce brand was stuck on a processor with 6% chargeback fees. Helix Pay cut that to 1.5% and their fraud screening stopped the synthetic ID attacks. Revenue is up 22%.',
+      'Our DTC e-commerce brand was stuck on a processor with 6% chargeback fees. Ecom Payments cut that to 1.5% and their fraud screening stopped the synthetic ID attacks. Revenue is up 22%.',
     name: 'Aisha Patel',
     role: 'COO, Lumen Beauty',
     industry: 'E-Commerce',
@@ -66,7 +66,7 @@ export default function Testimonials() {
             Merchants who stopped getting dropped
           </h2>
           <p className="mt-4 text-lg text-ink-300 text-balance">
-            Over 12,000 high-risk businesses process with Helix Pay. Here is what a few of them have to say.
+            Over 12,000 high-risk businesses process with Ecom Payments. Here is what a few of them have to say.
           </p>
         </div>
 

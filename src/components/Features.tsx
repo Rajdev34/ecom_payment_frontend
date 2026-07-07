@@ -53,7 +53,7 @@ export default function Features() {
 
       <div className="container-px mx-auto max-w-7xl">
         <div ref={ref} className={`reveal ${visible ? 'is-visible' : ''} mx-auto max-w-2xl text-center`}>
-          <span className="section-eyebrow">Why Helix Pay</span>
+          <span className="section-eyebrow">Why Ecom Payments</span>
           <h2 className="font-display text-3xl font-bold tracking-tight text-white text-balance sm:text-4xl lg:text-5xl">
             Everything you need to get paid
           </h2>

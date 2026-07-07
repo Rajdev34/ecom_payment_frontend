@@ -51,7 +51,7 @@ export default function Navbar() {
             <ShieldCheck className="h-5 w-5 text-ink-950" strokeWidth={2.5} />
           </div>
           <span className="font-display text-lg font-bold tracking-tight text-white">
-            Helix<span className="text-brand-400">Pay</span>
+            Ecom<span className="text-brand-400">Payments</span>
           </span>
         </a>
 
