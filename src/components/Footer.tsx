@@ -50,18 +50,40 @@ const socials = [
 ];
 
 export default function Footer() {
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      const targetId = href.substring(1);
+      const element = document.getElementById(targetId);
+      if (element) {
+        const offset = 80;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.scrollY - offset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    }
+  };
+
   return (
     <footer className="border-t border-ink-800 bg-ink-950">
       <div className="container-px mx-auto max-w-7xl py-16">
         <div className="grid gap-10 lg:grid-cols-[1.5fr_2fr]">
           {/* Brand column */}
           <div>
-            <a href="#top" className="flex items-center gap-2.5">
+            <a 
+              href="#top" 
+              onClick={(e) => handleLinkClick(e, '#top')}
+              className="flex items-center gap-2.5"
+            >
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700">
                 <ShieldCheck className="h-5 w-5 text-ink-950" strokeWidth={2.5} />
               </div>
               <span className="font-display text-lg font-bold tracking-tight text-white">
-                Tailored<span className="text-brand-400">Commerce</span>
+                Ecom<span className="text-brand-400">Payments</span>
               </span>
             </a>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-ink-400">
@@ -97,6 +119,7 @@ export default function Footer() {
                     <li key={link.label}>
                       <a
                         href={link.href}
+                        onClick={(e) => handleLinkClick(e, link.href)}
                         className="text-sm text-ink-400 transition-colors hover:text-brand-400"
                       >
                         {link.label}
@@ -111,12 +134,30 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-ink-800 pt-8 sm:flex-row">
           <p className="text-sm text-ink-500">
-            © {new Date().getFullYear()} Tailored Commerce Group, Inc. All rights reserved.
+            © {new Date().getFullYear()} Ecom Payments Group, Inc. All rights reserved.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-500">
-            <a href="#apply" className="transition-colors hover:text-ink-300">Terms</a>
-            <a href="#apply" className="transition-colors hover:text-ink-300">Privacy</a>
-            <a href="#faq" className="transition-colors hover:text-ink-300">Cookies</a>
+            <a 
+              href="#apply" 
+              onClick={(e) => handleLinkClick(e, '#apply')}
+              className="transition-colors hover:text-ink-300"
+            >
+              Terms
+            </a>
+            <a 
+              href="#apply" 
+              onClick={(e) => handleLinkClick(e, '#apply')}
+              className="transition-colors hover:text-ink-300"
+            >
+              Privacy
+            </a>
+            <a 
+              href="#faq" 
+              onClick={(e) => handleLinkClick(e, '#faq')}
+              className="transition-colors hover:text-ink-300"
+            >
+              Cookies
+            </a>
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-brand-500" />
               All systems operational
