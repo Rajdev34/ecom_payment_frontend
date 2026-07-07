@@ -179,24 +179,54 @@ export default function ApplyForm() {
 
     try {
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const formData = new FormData();
 
-      // 3. Append the file (guaranteed to exist now)
-      formData.append('document', docFile!);
+      // 1. Request a presigned upload URL from the backend
+      const ext = docFile!.name.split('.').pop() || 'zip';
+      const uniqueFileName = `${crypto.randomUUID()}.${ext}`;
 
-      // 4. Append all form details to the FormData object
-      Object.entries(form).forEach(([key, value]) => {
-        if (typeof value === 'boolean') {
-          formData.append(key, String(value));
-        } else if (value !== null && value !== undefined) {
-          formData.append(key, String(value));
-        }
+      const presignResponse = await fetch(`${apiBase}/api/applications/presign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: uniqueFileName,
+          fileType: docFile!.type,
+        }),
       });
 
-      // 5. Submit the single multipart request
+      if (!presignResponse.ok) {
+        const errorData = await presignResponse.json();
+        throw new Error(errorData.error || 'Failed to generate upload link.');
+      }
+
+      const { signedUrl, path } = await presignResponse.json();
+
+      // 2. Upload the file DIRECTLY to Supabase Storage using the signed URL
+      const uploadResponse = await fetch(signedUrl, {
+        method: 'PUT',
+        body: docFile!, // send the raw file object directly
+        headers: {
+          'Content-Type': docFile!.type,
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload ZIP document directly to storage.');
+      }
+
+      // 3. Submit application details as a clean JSON payload
+      const payload = {
+        ...form,
+        document_url: path, // passes the unique filename e.g. "uuid.zip"
+      };
+
       const response = await fetch(`${apiBase}/api/applications/submit`, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
