@@ -8,7 +8,6 @@ const stats = [
   { value: '$2B+', label: 'Processed annually' },
 ];
 
-// All paths sourced from Simple Icons (simpleicons.org) — MIT licensed
 const integrations = [
   {
     name: 'Shopify',
