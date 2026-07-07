@@ -164,22 +164,22 @@ describe('applicationSchema Zod validation', () => {
     }
   });
 
-  it('successfully cleans and coerces optional previous processor to a number if provided', () => {
-    const payload = { ...validBasePayload, previous_processor: '$150,000' };
+  it('successfully cleans and coerces optional existing processing duration to a number if provided', () => {
+    const payload = { ...validBasePayload, existing_processing: '24 months' };
     const result = applicationSchema.safeParse(payload);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.previous_processor).toBe(150000);
+      expect(result.data.existing_processing).toBe(24);
     }
   });
 
-  it('fails validation when optional previous processor has non-numeric text', () => {
-    const payload = { ...validBasePayload, previous_processor: 'Stripe Payments' };
+  it('fails validation when optional existing processing duration has non-numeric text', () => {
+    const payload = { ...validBasePayload, existing_processing: 'two years' };
     const result = applicationSchema.safeParse(payload);
     expect(result.success).toBe(false);
     if (!result.success) {
-      const procError = result.error.issues.find((issue) => issue.path.includes('previous_processor'));
-      expect(procError?.message).toBe('Previous processor must be a number');
+      const procError = result.error.issues.find((issue) => issue.path.includes('existing_processing'));
+      expect(procError?.message).toBe('Existing processing duration must be a number');
     }
   });
 

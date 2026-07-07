@@ -13,7 +13,8 @@ export const applicationSchema = z.object({
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z]+/g, '');
+        if (/[a-zA-Z]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9]+/g, '');
         return Number(clean);
       }
       return val;
@@ -48,7 +49,8 @@ export const applicationSchema = z.object({
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z]+/g, '');
+        if (/[a-zA-Z]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9]+/g, '');
         return Number(clean);
       }
       return val;
@@ -65,7 +67,8 @@ export const applicationSchema = z.object({
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z.-]+/g, '');
+        if (!/[0-9]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9.-]+/g, '');
         return Number(clean);
       }
       return val;
@@ -87,7 +90,8 @@ export const applicationSchema = z.object({
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z.-]+/g, '');
+        if (!/[0-9]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9.-]+/g, '');
         return Number(clean);
       }
       return val;
@@ -101,7 +105,8 @@ export const applicationSchema = z.object({
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z.-]+/g, '');
+        if (!/[0-9]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9.-]+/g, '');
         return Number(clean);
       }
       return val;
@@ -115,7 +120,8 @@ export const applicationSchema = z.object({
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z.-]+/g, '');
+        if (!/[0-9]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9.-]+/g, '');
         return Number(clean);
       }
       return val;
@@ -124,21 +130,22 @@ export const applicationSchema = z.object({
       .refine((val) => typeof val === 'number' && !isNaN(val), { message: 'High ticket transaction size must be a number' })
       .refine((val) => typeof val !== 'number' || isNaN(val) || val >= 0.01, { message: 'High ticket transaction size must be greater than zero' })
   ),
-  existing_processing: z.string().trim().nullable().optional().or(z.literal('')),
-  previous_processor: z.preprocess(
+  existing_processing: z.preprocess(
     (val) => {
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (trimmed === '') return undefined;
-        const clean = trimmed.replace(/[^0-9a-zA-Z.-]+/g, '');
+        if (!/[0-9]/.test(trimmed)) return NaN;
+        const clean = trimmed.replace(/[^0-9.-]+/g, '');
         return Number(clean);
       }
       return val;
     },
     z.custom<number | undefined>()
       .optional()
-      .refine((val) => val === undefined || (typeof val === 'number' && !isNaN(val)), { message: 'Previous processor must be a number' })
+      .refine((val) => val === undefined || (typeof val === 'number' && !isNaN(val)), { message: 'Existing processing duration must be a number' })
   ),
+  previous_processor: z.string().trim().nullable().optional().or(z.literal('')),
   
   description: z.string().trim().nullable().optional().or(z.literal('')),
 });
