@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Menu, X } from 'lucide-react';
 
 const links = [
   { label: 'Industries', href: 'industries' },
@@ -10,6 +10,7 @@ const links = [
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -36,8 +37,8 @@ export default function Navbar() {
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'border-b border-ink-800/80 bg-ink-950/80 backdrop-blur-xl'
+        scrolled || mobileMenuOpen
+          ? 'border-b border-ink-800/80 bg-ink-950/85 backdrop-blur-xl'
           : 'border-b border-transparent bg-transparent'
       }`}
     >
@@ -55,7 +56,7 @@ export default function Navbar() {
           </span>
         </a>
 
-        <div className="flex items-center gap-0.5">
+        <div className="hidden md:flex items-center gap-0.5">
           {links.map((link) => (
             <a
               key={link.href}
@@ -83,8 +84,49 @@ export default function Navbar() {
           >
             Get Started
           </a>
+          
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink-800 bg-ink-950/40 text-ink-300 hover:text-white md:hidden"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile Menu Dropdown */}
+      {mobileMenuOpen && (
+        <div className="absolute inset-x-0 top-16 z-40 border-b border-ink-800 bg-ink-950/95 p-6 backdrop-blur-xl md:hidden">
+          <div className="flex flex-col gap-4">
+            {links.map((link) => (
+              <a
+                key={link.href}
+                href={`#${link.href}`}
+                onClick={(e) => {
+                  scrollToSection(e, link.href);
+                  setMobileMenuOpen(false);
+                }}
+                className="text-base font-semibold text-ink-200 hover:text-white transition-colors py-1"
+              >
+                {link.label}
+              </a>
+            ))}
+            <hr className="border-ink-800" />
+            <a
+              href="#apply"
+              onClick={(e) => {
+                scrollToSection(e, 'apply');
+                setMobileMenuOpen(false);
+              }}
+              className="text-base font-semibold text-ink-200 hover:text-white transition-colors py-1 sm:hidden"
+            >
+              Sign In
+            </a>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
